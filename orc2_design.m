@@ -74,7 +74,7 @@ rmax = [q3_max q4_max];
 % Now, scale both input and output this values
 Du = diag(umax);
 Dr = diag(rmax);
-G = Du*Gp/Dr; %Thomas: 09.11.
+G = inv(Dr)*Gp*Du; %Jan: 13.11.
 
 % G is now our synthesis model used to design a controller.
 % When we apply this controller to the real plant, we need to remember to
@@ -96,11 +96,11 @@ G = Du*Gp/Dr; %Thomas: 09.11.
 % For W_S, the dcgain determines our inverse error constant, the bandwidth the speed
 % of response and the feedthroughgain limits the peak of S
 dcgain1 = 1000;
-bandwidth1 = 1;
+bandwidth1 = 4; %Jan: 13.11.
 feedthroughgain1 = 0.5;
 W_S1 = makeweight(dcgain1, bandwidth1, feedthroughgain1); % applied to v1
 dcgain2 = 1000;
-bandwidth2 = 1;
+bandwidth2 = 3; %Jan: 13.11.
 feedthroughgain2 = 0.5;
 W_S2 = makeweight(dcgain2, bandwidth2, feedthroughgain2); % applied to v2
 W_S  = mdiag(W_S1, W_S2);
@@ -109,12 +109,12 @@ W_S  = mdiag(W_S1, W_S2);
 % corresponds to the available actuator rates and the feedthroughgain limits 
 % authority at high frequencies
 dcgain_k1 = 0.9;
-bandwidth_k1 = 2;
-feedthroughgain_k1 = 100;
+bandwidth_k1 = 10; %Jan: 13.11.
+feedthroughgain_k1 = 1000; %Jan: 13.11.
 W_K1 = makeweight(dcgain_k1, bandwidth_k1, feedthroughgain_k1); % applied to u1
-dcgain_k2 = 0.7;
-bandwidth_k2 = 2;
-feedthroughgain_k2 = 100;
+dcgain_k2 = 0.9; %Jan: 13.11.
+bandwidth_k2 = 10; %Jan: 13.11.
+feedthroughgain_k2 = 1000; %Jan: 13.11.
 W_K2 = makeweight(dcgain_k2, bandwidth_k2, feedthroughgain_k2); % applied to u2
 W_K  = mdiag(W_K1, W_K2);
 
@@ -127,14 +127,14 @@ sigma(W_S^-1,W_K^-1,w)
 %
 % For our synthesis tools to work, we need to first assemble a generalized 
 % plant that includes performance inputs/outputs that represent S and KS.
-systemnames = 'XXX';
-inputvar = [XXX];
-input_to_G = '[XXX]';
-input_to_W_S = '[XXX]';
-input_to_W_K = '[XXX]';
-outputvar = [XXX];
+systemnames = 'G W_S W_K'; %Jan: 13.11.
+inputvar = '[w{2}; u{2}]'; %Jan: 13.11.
+input_to_G = '[u]'; %Jan: 13.11.
+input_to_W_S = '[w-G]'; %Jan: 13.11.
+input_to_W_K = '[u]'; %Jan: 13.11.
+outputvar = '[W_S;W_K;w-G]'; %Jan: 13.11.
 cleanupsysic = 'yes'; %this just deletes the temporary variables afterwards
-P = sysic
+P = sysic;
 
 % We can also use the command P = AUGW(G,W_S,W_K) [augment with weights] 
 % to get our generalized plant. 
@@ -162,9 +162,9 @@ sigma(P,P_verify,w)
 % that is at most 10% worse in the H-Infinity sense.
 
 % optimal synthesis to obtain the best possible gam
-[~,~,gam,~] = hinfsyn(XXX);
+[~,~,gam,~] = hinfsyn(ssbal(P),nmeas,ncont,'method','lmi'); %Jan: 13.11.
 % suboptimal synthesis in which a controller with 1.1*gam is sufficient
-[K,CL,gam] = hinfsyn(XXX);
+[K,CL,gam] = hinfsyn(ssbal(P),nmeas,ncont,'method','lmi','GMIN',1.1*gam); %Jan: 13.11.
 gam
 
 % The first thing that we should always check is whether everything worked
@@ -193,7 +193,7 @@ fastestpole = max(abs(eig(K.a)))
 % as well as the transfer functions K*S and S*G (which are for square
 % plants the same as Si*K and G*Si, respectively)
 
-loops = loopsens(XXX);
+loops = loopsens(G,K); %Jan: 13.11.
 figure(4);
 subplot(2,2,1)
 sigma(loops.So,W_S^-1,w)
@@ -265,10 +265,10 @@ title('Disturbance response S/KS mixed sensitivity')
 % is that they correspond to simultaneous gain and phase variations at ALL
 % plant inputs and outputs and are therefore a relatively safe measure for
 % robustness of MIMO systems
-mm = loopmargin(XXX,'m');
+mm = loopmargin(G*K,'m'); %Jan: 13.11. 
 minGM = db(mm.GainMargin(2))
 minPM = min(mm.PhaseMargin(2))
-% For the example, we get something like 9db and 50° Phase, which is
+% For the example, we get something like 9db and 50Â° Phase, which is
 % an excellent result.
 
 
@@ -282,7 +282,7 @@ minPM = min(mm.PhaseMargin(2))
 % 2) a steady state error of less than 1% on both channels
 % 3) the control input magnitude should not exceed 1 at any time 
 % 4) a controller with a fastest pole < 2000 rad/s 
-% 5) 3db and 30° Phase Multiloop Disk Margin
+% 5) 3db and 30Â° Phase Multiloop Disk Margin
 
 % Once you're design is satisfactory, take a look at the following 
 % Section 4 which discusses a more advanced design approach.
